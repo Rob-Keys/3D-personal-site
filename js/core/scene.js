@@ -3,7 +3,8 @@
  * Handles Three.js scene, camera, renderer, and lighting setup
  */
 
-import { PORTFOLIO_CONFIG } from './config.js';
+import { PORTFOLIO_CONFIG, LIGHTING_CONFIG, OBJECT_ORIGINS } from '../config/config.js';
+import { LightingSystem } from '../systems/lighting.js';
 
 export class SceneManager {
     constructor() {
@@ -12,51 +13,31 @@ export class SceneManager {
         this.renderer = null;
         this.controls = null;
         this.composer = null; // Post-processing composer
+        this.lightingSystem = null; // Unified lighting management
 
-        // Origin reference points for scene objects
-        this.origins = {
-            floor: { x: 0, y: -0.5, z: 0, rotationX: -Math.PI / 2, rotationY: 0, rotationZ: 0 }
-        };
+        // Use centralized origins from config
+        this.origins = OBJECT_ORIGINS.scene;
     }
 
-    /**
-     * Initialize the Three.js scene
-     */
     init() {
-        // Initialize RectAreaLight uniforms (required for rectangular lights)
-        if (THREE.RectAreaLightUniformsLib) {
-            THREE.RectAreaLightUniformsLib.init();
-        }
-
-        let start = performance.now();
         this.createScene();
         this.createCamera();
-        console.log(`[PERF]   Scene + Camera: ${(performance.now() - start).toFixed(1)}ms`);
-
-        start = performance.now();
         this.createRenderer();
-        console.log(`[PERF]   Renderer: ${(performance.now() - start).toFixed(1)}ms`);
-
-        start = performance.now();
         this.createControls();
-        this.addLights();
-        console.log(`[PERF]   Controls + Lights: ${(performance.now() - start).toFixed(1)}ms`);
 
-        start = performance.now();
+        // Initialize the unified lighting system
+        this.lightingSystem = new LightingSystem(this.renderer, this.scene);
+        this.lightingSystem.init();
+
+        // Expose lights reference for backward compatibility
+        this.lights = this.lightingSystem.lights;
+
         this.setupPostProcessing();
-        console.log(`[PERF]   Post-processing: ${(performance.now() - start).toFixed(1)}ms`);
-
         this.createFloor();
 
-        // Handle window resize
         window.addEventListener('resize', () => this.onWindowResize());
 
-        return {
-            scene: this.scene,
-            camera: this.camera,
-            renderer: this.renderer,
-            controls: this.controls
-        };
+        return { scene: this.scene, camera: this.camera, renderer: this.renderer, controls: this.controls };
     }
 
     /**
@@ -86,15 +67,10 @@ export class SceneManager {
             far
         );
 
-        // Adjust for mobile/portrait orientation to keep desk in view
-        const isPortrait = window.innerHeight > window.innerWidth;
-        const zOffset = isPortrait ? 3.0 : 0;
-        const yOffset = isPortrait ? 1.0 : 0;
-
         this.camera.position.set(
             initialPosition.x,
-            initialPosition.y + yOffset,
-            initialPosition.z + zOffset
+            initialPosition.y,
+            initialPosition.z
         );
     }
 
@@ -118,7 +94,12 @@ export class SceneManager {
 
         // ACESFilmic tone mapping for cinematic look
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 0.8;
+        this.renderer.toneMappingExposure = 1.0; // Increased from 0.8 for physically correct lights
+
+        // Enable physically correct light units
+        if (this.renderer.physicallyCorrectLights !== undefined) {
+            this.renderer.physicallyCorrectLights = true;
+        }
 
         // Output encoding for correct color representation
         // r128 uses outputEncoding with THREE.sRGBEncoding
@@ -140,76 +121,11 @@ export class SceneManager {
         this.controls.maxDistance = PORTFOLIO_CONFIG.controls.maxDistance;
         this.controls.maxPolarAngle = PORTFOLIO_CONFIG.controls.maxPolarAngle;
 
-        // Check for mobile device (width < 768px)
-        const isMobile = window.innerWidth < 768;
-
-        if (isMobile) {
-            this.controls.enableRotate = true;
-            this.controls.enablePan = true;
-            this.controls.minAzimuthAngle = -Math.PI / 3; // Limit horizontal rotation
-            this.controls.maxAzimuthAngle = Math.PI / 3;
-        } else {
-            this.controls.enableRotate = false;
-            this.controls.enablePan = false;
-        }
+        this.controls.enableRotate = true;
+        this.controls.enablePan = true;
         this.controls.enableZoom = false;
 
         this.controls.target.set(0, 2, 0);
-    }
-
-    /**
-     * Add realistic lighting to the scene
-     * Low ambient for moody atmosphere where emissive objects stand out
-     */
-    addLights() {
-        // Minimal ambient light - just enough to prevent pure black shadows
-        const ambientLight = new THREE.AmbientLight(0x101018, 0.08);
-        this.scene.add(ambientLight);
-
-        // Very subtle hemisphere light
-        const hemisphereLight = new THREE.HemisphereLight(
-            0x87AECB, // Sky color - light blue
-            0x8b7355, // Ground color - warm tan
-            0.06
-        );
-        this.scene.add(hemisphereLight);
-
-        // Main directional light - dim window light from upper right
-        const mainLight = new THREE.DirectionalLight(0xffeedd, 0.22);
-        mainLight.position.set(-5, 8, 3);
-        mainLight.castShadow = true;
-        mainLight.shadow.mapSize.width = 4096;
-        mainLight.shadow.mapSize.height = 4096;
-        mainLight.shadow.camera.near = 0.5;
-        mainLight.shadow.camera.far = 25;
-        mainLight.shadow.camera.left = -10;
-        mainLight.shadow.camera.right = 10;
-        mainLight.shadow.camera.top = 10;
-        mainLight.shadow.camera.bottom = -10;
-        mainLight.shadow.bias = -0.0001;
-        this.scene.add(mainLight);
-
-        // Fill light from left - very subtle cool tone
-        const fillLight = new THREE.DirectionalLight(0xaaccff, 0.08);
-        fillLight.position.set(5, 4, 2);
-        this.scene.add(fillLight);
-
-        // Back rim light for edge definition
-        const rimLight = new THREE.DirectionalLight(0xffffff, 0.04);
-        rimLight.position.set(0, 4, -6);
-        this.scene.add(rimLight);
-
-        // Store lights for dynamic updates
-        this.lights = {
-            ambient: ambientLight,
-            hemisphere: hemisphereLight,
-            main: mainLight,
-            fill: fillLight,
-            rim: rimLight
-        };
-
-        // Array to store screen/emissive light sources added by factories
-        this.emissiveLights = [];
     }
 
     /**
@@ -230,16 +146,92 @@ export class SceneManager {
         this.composer.addPass(renderPass);
 
         // Add bloom pass for glowing emissive surfaces (screens, lamp)
+        // Refined settings for more subtle, realistic glow
         const bloomPass = new THREE.UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
             0.3,   // Bloom strength
-            0.4,   // Radius
-            0.7    // Threshold - emissive objects will bloom
+            0.5,   // Radius (increased from 0.4 for softer glow)
+            0.8    // Threshold (increased from 0.7 - only brightest objects bloom)
         );
         this.composer.addPass(bloomPass);
 
         // Store bloom pass for potential adjustments
         this.bloomPass = bloomPass;
+
+        // Add outline pass for hint glow on interactive objects.
+        //
+        // The stock OutlinePass overlay shader multiplies edge output by
+        // maskColor.r, which is 0 for non-selected pixels.  With
+        // AdditiveBlending this means nothing is added to unselected areas,
+        // but the intermediate scene re-renders (depth, mask) still run and
+        // can subtly shift the image, causing perceived dimming.
+        //
+        // Fix: replace overlayMaterial with a version that drops the
+        // maskColor.r factor entirely.  The replacement MUST keep every
+        // uniform the render() method writes to, otherwise the assignment
+        // throws and the overlay never composites (leaving only the dimming
+        // side-effects).
+        if (THREE.OutlinePass) {
+            const outlinePass = new THREE.OutlinePass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                this.scene,
+                this.camera
+            );
+            outlinePass.visibleEdgeColor.set(0xff3333);
+            outlinePass.hiddenEdgeColor.set(0xff3333);
+            outlinePass.edgeStrength = 2.0;
+            outlinePass.edgeGlow = 0.3;
+            outlinePass.edgeThickness = 1.0;
+            outlinePass.pulsePeriod = 3.0;
+            outlinePass.enabled = false;
+
+            // Replace the overlay material.  All uniforms the render() method
+            // writes to must be present or the assignment will throw.
+            outlinePass.overlayMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    'maskTexture': { value: null },
+                    'edgeTexture1': { value: null },
+                    'edgeTexture2': { value: null },
+                    'patternTexture': { value: null },
+                    'edgeStrength': { value: 1.0 },
+                    'edgeGlow': { value: 1.0 },
+                    'usePatternTexture': { value: 0.0 }
+                },
+                vertexShader: [
+                    'varying vec2 vUv;',
+                    'void main() {',
+                    '    vUv = uv;',
+                    '    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);',
+                    '}'
+                ].join('\n'),
+                fragmentShader: [
+                    'varying vec2 vUv;',
+                    'uniform sampler2D edgeTexture1;',
+                    'uniform sampler2D edgeTexture2;',
+                    'uniform float edgeStrength;',
+                    'uniform float edgeGlow;',
+                    'void main() {',
+                    '    vec4 edge = texture2D(edgeTexture1, vUv)',
+                    '             + texture2D(edgeTexture2, vUv) * edgeGlow;',
+                    '    gl_FragColor = edgeStrength * edge;',
+                    '}'
+                ].join('\n'),
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                depthWrite: false,
+                transparent: true
+            });
+
+            this.composer.addPass(outlinePass);
+            this.outlinePass = outlinePass;
+        }
+    }
+
+    /**
+     * Get the outline pass for hint glow
+     */
+    getOutlinePass() {
+        return this.outlinePass || null;
     }
 
     /**
@@ -247,8 +239,7 @@ export class SceneManager {
      * @param {THREE.Light} light - The light to add
      */
     addEmissiveLight(light) {
-        this.emissiveLights.push(light);
-        this.scene.add(light);
+        this.lightingSystem.addEmissiveLight(light);
     }
 
     /**
@@ -265,8 +256,9 @@ export class SceneManager {
         const floorGeometry = new THREE.PlaneGeometry(50, 50);
         const floorMaterial = new THREE.MeshStandardMaterial({
             color: 0x7F8076,
-            roughness: 0.8,
-            metalness: 0.2
+            roughness: 0.85,
+            metalness: 0.1,
+            envMapIntensity: LIGHTING_CONFIG.environment.floor
         });
 
         const floor = new THREE.Mesh(floorGeometry, floorMaterial);
@@ -278,6 +270,10 @@ export class SceneManager {
         );
         floor.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
         floor.receiveShadow = true;
+
+        // Freeze floor matrix for performance (static object)
+        floor.updateMatrixWorld(true);
+        floor.matrixAutoUpdate = false;
 
         this.scene.add(floor);
     }
@@ -293,6 +289,9 @@ export class SceneManager {
         // Update composer size if available
         if (this.composer) {
             this.composer.setSize(window.innerWidth, window.innerHeight);
+        }
+        if (this.outlinePass) {
+            this.outlinePass.setSize(window.innerWidth, window.innerHeight);
         }
     }
 

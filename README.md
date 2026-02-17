@@ -18,15 +18,10 @@ A stunning, fully interactive 3D portfolio website built with Three.js. Explore 
 
 | Object | Content |
 | -------- | --------- |
-| 🖥️ **Monitor** | About Me |
-| ⌨️ **Keyboard** | Coding Skills |
-| ☕ **Coffee Mug** | Interests & Hobbies |
+| 🖥️ **Monitor** | Overview |
 | 💻 **Laptop** | Featured Projects |
-| 🌱 **Plant** | Work Experience |
-| 🖼️ **Picture Frame** | Education & Transcript |
-| 📕 **Red Book** | Resume |
-| 📗 **Green Book** | Contact Information |
-| 💡 **Desk Lamp** | Achievements & Awards |
+| 🖼️ **Picture Frame** | Diploma |
+|  **Notebook** | Current Projects |
 
 ## 🚀 Quick Start
 
@@ -75,10 +70,10 @@ Navigate to `http://localhost:8000`
 
 ### Editing Your Content
 
-All portfolio content is centralized in [`js/config.js`](js/config.js). Simply edit this file to update your information:
+All portfolio content is centralized in [`js/config/content.js`](js/config/content.js). Simply edit this file to update your information:
 
 ```javascript
-// js/config.js
+// js/config/content.js
 
 export const CONTENT_DATA = {
     monitor: {
@@ -94,7 +89,7 @@ export const CONTENT_DATA = {
 
 ### Customizing Scene Settings
 
-Adjust camera, lighting, and animation settings in [`js/config.js`](js/config.js):
+Adjust camera, lighting, and animation settings in [`js/config/config.js`](js/config/config.js):
 
 ```javascript
 export const PORTFOLIO_CONFIG = {
@@ -117,20 +112,20 @@ export const PORTFOLIO_CONFIG = {
 
 To add new interactive objects:
 
-1. Create a new function in [`js/objects.js`](js/objects.js)
-2. Add content data in [`js/config.js`](js/config.js)
-3. Call your creation function in `createAllObjects()`
+1. Create a new factory function in the appropriate file under `js/factories/`
+2. Add content data in [`js/config/content.js`](js/config/content.js)
+3. Register the object in [`js/factories/objects.js`](js/factories/objects.js)
 
 Example:
 
 ```javascript
-// In js/objects.js
+// In js/factories/desk-objects.js
 createNewObject() {
     const group = new THREE.Group();
     // ... create your 3D object
     group.userData = { name: 'newObject', label: 'New Object - Info' };
     this.interactiveObjects.push(group);
-    this.scene.add(group);
+    return group;
 }
 ```
 
@@ -138,18 +133,34 @@ createNewObject() {
 
 ```bash
 3d-desk-portfolio/
-├── index.html              # Main HTML file
-├── styles.css              # Styles (embedded in HTML)
+├── index.html                    # Main HTML entry point
+├── css/
+│   └── styles.css               # Application styles
 ├── js/
-│   ├── main.js            # Application entry point
-│   ├── config.js          # Configuration and content data
-│   ├── scene.js           # Three.js scene setup
-│   ├── objects.js         # 3D object creation
-│   └── interactions.js    # User interaction handling
-├── README.md              # This file
-├── .claude/
-│   └── instructions.md    # AI assistant context
-└── LICENSE                # MIT License
+│   ├── core/                    # Core application modules
+│   │   ├── main.js              # Application entry point
+│   │   ├── scene.js             # Three.js scene, camera & renderer setup
+│   │   └── interactions.js      # User interaction handling & raycasting
+│   ├── config/                  # Configuration & content data
+│   │   ├── config.js            # Technical settings (shadows, lighting, positions)
+│   │   └── content.js           # Portfolio content (text, descriptions)
+│   ├── systems/                 # Core systems & utilities
+│   │   ├── lighting.js          # Lighting system, day/night cycle, glare effects
+│   │   └── utils.js             # Shared utility functions
+│   └── factories/               # 3D object creation modules
+│       ├── objects.js           # Main object factory orchestrator
+│       ├── furniture.js         # Desk, walls, shelves
+│       ├── technology.js        # Monitor, keyboard, mouse, laptop, clock
+│       ├── desk-objects.js      # Coffee mug, notebook, desk lamp
+│       ├── shelf-objects.js     # Books, plants
+│       ├── wall-objects.js      # Diploma, vinyl records
+│       └── monitor-renderer.js  # Monitor screen canvas rendering
+├── assets/
+│   ├── images/                  # Portfolio images
+│   └── textures/                # 3D textures (wood, wall, etc.)
+├── AGENTS.md                    # AI assistant context
+├── README.md                    # This file
+└── LICENSE                      # MIT License
 ```
 
 ## 🎨 Technologies Used
@@ -170,7 +181,7 @@ createNewObject() {
 
 ### Changing Object Colors
 
-Edit the material properties in [`js/objects.js`](js/objects.js):
+Edit the material properties in the relevant factory file (e.g., [`js/factories/desk-objects.js`](js/factories/desk-objects.js)):
 
 ```javascript
 const material = new THREE.MeshStandardMaterial({
@@ -182,7 +193,7 @@ const material = new THREE.MeshStandardMaterial({
 
 ### Adjusting Lighting
 
-Modify lighting in [`js/scene.js`](js/scene.js):
+Modify lighting in [`js/systems/lighting.js`](js/systems/lighting.js):
 
 ```javascript
 const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -191,7 +202,7 @@ const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
 
 ### Changing Camera Zoom Behavior
 
-Edit animation settings in [`js/config.js`](js/config.js):
+Edit animation settings in [`js/config/config.js`](js/config/config.js):
 
 ```javascript
 animation: {
@@ -218,9 +229,9 @@ animation: {
 **Problem**: Low frame rate on older devices
 **Solution**:
 
-- Reduce shadow map size in `scene.js`
-- Lower the number of polygon segments in `objects.js`
-- Disable fog in `config.js`
+- Reduce shadow map size in `js/config/config.js`
+- Lower the number of polygon segments in the factory files under `js/factories/`
+- Disable fog in `js/config/config.js`
 
 ## 📄 License
 
@@ -257,7 +268,7 @@ Want to customize further? Check out these resources:
 If you encounter issues or have questions:
 
 1. Check the troubleshooting section above
-2. Review the `.claude/instructions.md` file for additional context
+2. Review the `AGENTS.md` file for additional context
 3. Open an issue on GitHub
 
 ## 🌟 Showcase

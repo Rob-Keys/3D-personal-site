@@ -1,124 +1,14 @@
 /**
- * Configuration file for portfolio content
- * Edit this file to customize all the information displayed in your 3D desk portfolio
+ * Content data for portfolio
+ * Contains all text content displayed in the 3D portfolio
+ * Separated from configuration for clear separation of concerns
  */
-
-/**
- * Standard material presets for consistent appearance across objects.
- * Materials are grouped by type for easy lookup and reuse.
- */
-export const MATERIALS = {
-    // Metal finishes
-    darkMetal: {
-        color: 0x1a1a1a,
-        roughness: 0.4,
-        metalness: 0.9
-    },
-    brushedMetal: {
-        color: 0x2a2a2a,
-        roughness: 0.3,
-        metalness: 0.8
-    },
-    chromeMetal: {
-        color: 0x3a3a3a,
-        roughness: 0.2,
-        metalness: 0.9
-    },
-    goldMetal: {
-        color: 0xffd700,
-        roughness: 0.1,
-        metalness: 0.9,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.2
-    },
-
-    // Plastics and matte surfaces
-    darkPlastic: {
-        color: 0x1a1a1a,
-        roughness: 0.8,
-        metalness: 0.1
-    },
-    whitePlastic: {
-        color: 0xf0f0f0,
-        roughness: 0.2,
-        metalness: 0.0
-    },
-    rubber: {
-        color: 0x2a2a2a,
-        roughness: 0.9,
-        metalness: 0.0
-    },
-
-    // Glass and transparent materials
-    glass: {
-        color: 0xffffff,
-        roughness: 0.0,
-        metalness: 0.0,
-        transmission: 0.9,
-        transparent: true,
-        opacity: 0.2,
-        ior: 1.5
-    },
-    screenGlass: {
-        roughness: 0.05,
-        metalness: 0.0,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.05
-    },
-
-    // Wood tones
-    lightWood: {
-        roughness: 0.7,
-        metalness: 0.05
-    },
-    darkWood: {
-        color: 0x4a3c2a,
-        roughness: 0.5,
-        metalness: 0.2
-    },
-
-    // Ceramic and pottery
-    ceramic: {
-        roughness: 0.2,
-        metalness: 0.0,
-        clearcoat: 0.8,
-        clearcoatRoughness: 0.3
-    },
-    terracotta: {
-        color: 0xd4a574,
-        roughness: 0.7,
-        metalness: 0.0
-    }
-};
-
-/**
- * Common colors used throughout the application.
- * Centralized for easy theming and consistency.
- */
-export const COLORS = {
-    // UI and lighting
-    background: 0x1a1a2e,
-    fog: 0x1a1a2e,
-
-    // LED indicator colors
-    ledGreen: 0x00ff00,
-    ledRed: 0xff0000,
-    ledBlue: 0x00aaff,
-
-    // Accent colors
-    gold: 0xffd700,
-    warmLight: 0xffffcc,
-
-    // Paper and fabric
-    paper: 0xf8f8f0,
-    parchment: 0xf5f0e1
-};
 
 /**
  * Shared content blocks for reuse across multiple objects.
  * Prevents duplication and ensures consistency.
  */
-const SHARED_CONTENT = {
+export const SHARED_CONTENT = {
     resumeSummary: `
         <h3>Professional Summary</h3>
         <p>Rob Keys - Software Development Engineer at Amazon Web Services</p>
@@ -150,65 +40,7 @@ const SHARED_CONTENT = {
             <p><strong>Summer 2025</strong> | Seattle, WA</p>
             <p>Completed a 12-week internship as an SDE1 intern at AWS, working on distributed systems and cloud infrastructure. This experience provided hands-on exposure to large-scale systems and professional software development practices.</p>
         </div>
-    `,
-
-    educationBase: `
-        <h3>Academic Background</h3>
-        <p><strong>Bachelor of Science in Computer Science</strong></p>
-        <p>University of Virginia</p>
-        <ul>
-            <li>GPA: 4.0/4.0</li>
-            <li>Graduated in three years</li>
-            <li><a href="https://cyberinnovation.virginia.edu/department-computer-science-cybersecurity-focal-path" target="_blank">NCAE-Certified</a> focal path in Cybersecurity</li>
-        </ul>
     `
-};
-
-/**
- * Zoom distances for each interactive object type.
- * Smaller values = closer zoom.
- */
-export const ZOOM_CONFIG = {
-    monitor: { distance: 2, yOffset: 1.35, targetYOffset: 1.35 },
-    laptop: { distance: 0.8, yOffset: 1, targetYOffset: 0.6, useRotation: true },
-    notebook: { distance: 0.1, yOffset: 1, targetYOffset: 0, useRotation: true },
-    default: { distance: 1.5, yOffset: 0, targetYOffset: 0 }
-};
-
-export const PORTFOLIO_CONFIG = {
-    // Scene configuration
-    scene: {
-        backgroundColor: 0x1a1a2e,
-        fogColor: 0x1a1a2e,
-        fogNear: 10,
-        fogFar: 50
-    },
-
-    // Camera configuration
-    camera: {
-        fov: 60,
-        near: 0.05,
-        far: 50, // Increased to prevent clipping on mobile/steep angles
-        initialPosition: { x: 0, y: 2.5, z: 4 } // Much closer and more upward facing
-    },
-
-    // Controls configuration
-    controls: {
-        dampingFactor: 0.05,
-        minDistance: 0.1, // Allow closer zoom
-        maxDistance: 10, // Allow movement
-        maxPolarAngle: Math.PI / 2, // Limit vertical angle
-        enableRotate: true, // Disable manual rotation
-        enablePan: true,    // Disable manual panning
-        enableZoom: false    // Disable manual zooming
-    },
-
-    // Animation configuration
-    animation: {
-        zoomDuration: 1.5,
-        zoomDistance: 2,
-        zoomEase: "power2.inOut"
-    }
 };
 
 /**
@@ -264,32 +96,8 @@ export const CONTENT_DATA = {
         `
     },
     laptop: {
-        title: "My Projects",
-        content: `
-            <h3>Previous Projects</h3>
-            <div style="margin-bottom: 20px;">
-                <h4>🍰 703bakehouse.com</h4>
-                <p>A website for a local bakery business</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4>🥚 Eggs By The Dozen</h4>
-                <p>Full-stack application project</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4>📊 Statistics R Project</h4>
-                <p>Data analysis and visualization using R</p>
-            </div>
-
-            <h3>Current Projects</h3>
-            <div style="margin-bottom: 20px;">
-                <h4>🚀 This Website!</h4>
-                <p>Interactive 3D portfolio built with Three.js</p>
-                <ul>
-                    <li><strong>Tech:</strong> Three.js, WebGL, GSAP, JavaScript</li>
-                    <li><strong>Features:</strong> Real-time 3D rendering, camera animations, raycasting</li>
-                </ul>
-            </div>
-        `
+        title: "Work Experience",
+        content: SHARED_CONTENT.workExperience
     },
     plant: {
         title: "Work Experience",
@@ -365,7 +173,7 @@ export const CONTENT_DATA = {
             <p>This disciplined approach enabled me to excel academically while also participating in Division I athletics.</p>
         `
     },
-    certificate: {
+    diploma: {
         title: "Education",
         content: `
             <h3>Academic Background</h3>
@@ -391,7 +199,7 @@ export const CONTENT_DATA = {
         content: `
             <h3>Creative Inspiration</h3>
             <p>Music plays a huge role in my creative process. It helps me focus and find rhythm in my coding.</p>
-            
+
             <h3>Favorite Genres</h3>
             <ul>
                 <li>Lo-Fi Beats for coding</li>
@@ -416,34 +224,6 @@ export const CONTENT_DATA = {
             <p>A balanced approach keeps me energized and brings fresh perspectives to technical challenges.</p>
         `
     },
-    trophy: {
-        title: "Achievements",
-        content: `
-            <h3>Academic Achievements</h3>
-            <div style="margin-bottom: 20px;">
-                <h4>🎓 Perfect GPA</h4>
-                <p>Graduated with a 4.0 GPA from the University of Virginia</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4>⚡ Accelerated Graduation</h4>
-                <p>Completed B.S. in Computer Science in three years</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4>🔒 NCAE-Certified</h4>
-                <p>Completed <a href="https://cyberinnovation.virginia.edu/department-computer-science-cybersecurity-focal-path" target="_blank">NCAE-Certified</a> focal path in Cybersecurity</p>
-            </div>
-
-            <h3>Professional Achievements</h3>
-            <div style="margin-bottom: 20px;">
-                <h4>💼 AWS Full-Time Offer</h4>
-                <p>Accepted Software Development Engineer position at Amazon Web Services starting June 2026</p>
-            </div>
-            <div style="margin-bottom: 20px;">
-                <h4>🏈 College Athlete</h4>
-                <p>Division I football player - demonstrated teamwork and leadership under pressure</p>
-            </div>
-        `
-    },
     mouse: {
         title: "Navigation & Tools",
         content: `
@@ -466,7 +246,21 @@ export const CONTENT_DATA = {
         `
     },
     notebook: {
-        title: "Work Experience",
-        content: SHARED_CONTENT.workExperience
+        title: "Personal Projects",
+        content: `
+            <h3>Personal Projects</h3>
+            <div style="margin-bottom: 20px;">
+                <h4>Variety</h4>
+                <p>Open-source contributor to Variety, a wallpaper downloader and manager for Linux systems. Submitted PRs with CI/CD integration.</p>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4>SweetHopeBakeryy</h4>
+                <p>Full-stack web application for a family bakery business. Originally built in PHP, then rewritten as a static JavaScript site to reduce hosting costs.</p>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4>Slot Machine Clock</h4>
+                <p>A Tidbyt app built in Starlark that displays the current time using a slot machine animation. Published to the Tidbyt community app platform.</p>
+            </div>
+        `
     }
 };

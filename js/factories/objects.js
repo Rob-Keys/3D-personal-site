@@ -10,14 +10,15 @@ import { DeskObjectFactory } from './desk-objects.js';
 import { WallObjectFactory } from './wall-objects.js';
 
 export class ObjectFactory {
-    constructor(scene) {
+    constructor(scene, lightingSystem = null) {
         this.scene = scene;
+        this.lightingSystem = lightingSystem;
         this.interactiveObjects = [];
 
         // Initialize modular factories
         this.factories = {
             furniture: new FurnitureFactory(scene),
-            technology: new TechnologyFactory(scene),
+            technology: new TechnologyFactory(scene, lightingSystem),
             shelf: new ShelfObjectFactory(scene),
             desk: new DeskObjectFactory(scene),
             wall: new WallObjectFactory(scene)
@@ -38,18 +39,16 @@ export class ObjectFactory {
 
     async createAllObjects() {
         const { furniture, technology, shelf, desk, wall } = this.factories;
-        const start = performance.now();
 
-        // Create all objects in parallel - no dependencies between them
+        // Create all objects - interactive: true means clickable for zoom/info panel
         const objects = [
             // Furniture (non-interactive)
             { obj: furniture.createWall(), interactive: false },
             { obj: furniture.createDesk(), interactive: false },
             { obj: furniture.createWallShelf(), interactive: false },
             // Wall objects
-            { obj: wall.createWallCertificate(), interactive: true },
+            { obj: wall.createWallDiploma(), interactive: true },
             { obj: wall.createVinylRecord(), interactive: false },
-            { obj: wall.createMobileWarningSign(), interactive: false },
             // Shelf objects
             { obj: shelf.createShelfPlant(), interactive: false },
             { obj: shelf.createShelfBooks(), interactive: false },
@@ -59,18 +58,23 @@ export class ObjectFactory {
             { obj: technology.createMouse(), interactive: false },
             { obj: technology.createLaptop(), interactive: true },
             { obj: technology.createDigitalClock(), interactive: false },
-            // Desk objects
-            { obj: desk.createCoffeeMug(), interactive: true },
+            // Desk objects - coffee/lamp have animations but aren't clickable
+            { obj: desk.createCoffeeMug(), interactive: false },
             { obj: desk.createNotebook(), interactive: true },
-            { obj: desk.createDeskLamp(), interactive: true }
+            { obj: desk.createDeskLamp(), interactive: false }
         ];
 
-        // Add all objects to scene in single batch
         objects.forEach(({ obj, interactive }) => this.addToScene(obj, interactive));
 
-        console.log(`[PERF]   All objects created: ${(performance.now() - start).toFixed(1)}ms`);
-
         return this.interactiveObjects;
+    }
+
+    /**
+     * Finalize objects that need post-render setup (e.g., light targeting).
+     * Call this after the first render when world matrices are computed.
+     */
+    finalizeObjects() {
+        this.factories.wall.finalizeDiplomaLight();
     }
 
     /**

@@ -1,22 +1,19 @@
 /**
  * Technology objects creation
  * Handles monitor, keyboard, mouse, laptop, and other tech items
- *
  */
 
+import { applyOrigin, wrapText } from '../systems/utils.js';
+import { LIGHTING_CONFIG, OBJECT_ORIGINS } from '../config/config.js';
+
 export class TechnologyFactory {
-    constructor(scene) {
+    constructor(scene, lightingSystem = null) {
         this.scene = scene;
+        this.lightingSystem = lightingSystem;
         this.interactiveObjects = [];
 
-        // Origin reference points for each object - change these to reposition entire objects
-        this.origins = {
-            monitor:  { x: 0,    y: 1, z: -0.8, rotationX: 0, rotationY: 0, rotationZ: 0 },
-            keyboard: { x: 0,    y: 0.94, z: 0.4,  rotationX: 0, rotationY: Math.PI, rotationZ: 0 },
-            mouse:    { x: 1.3,  y: 1, z: 0.3,  rotationX: 0, rotationY: 0, rotationZ: 0 },
-            laptop:   { x: -2.4, y: 0.85, z: 0.5, rotationX: 0, rotationY: Math.PI / 4, rotationZ: 0 },
-            clock:    { x: 1, y: 0.83, z: -0.7, rotationX: 0, rotationY: -Math.PI / 9, rotationZ: 0 }
-        };
+        // Use centralized origins from config
+        this.origins = OBJECT_ORIGINS.technology;
     }
 
     /**
@@ -30,7 +27,7 @@ export class TechnologyFactory {
         // Part offsets relative to monitor origin (origin is at base center)
         // Screen faces forward (+Z), stand/arm is behind (-Z)
         const offsets = {
-            screen:      { x: 0,    y: 1.35, z: 0.15   },  // Screen in front (moved forward to prevent z-fighting)
+            screen:      { x: 0,    y: 1.35, z: 0.05   },  // Screen in front (moved forward to prevent z-fighting)
             bezel:       { x: 0,    y: 1.35, z: 0      },  // Bezel behind screen
             innerBezel:  { x: 0,    y: 1.35, z: -0.02  },
             led:         { x: 1.3,  y: 1.25, z: 0.02   },  // LED on front
@@ -61,25 +58,25 @@ export class TechnologyFactory {
         requestAnimationFrame(() => setTimeout(() => {
             // Header (h1 style)
             ctx.fillStyle = '#333333';
-            ctx.font = 'bold 80px Arial';
+            ctx.font = 'bold 54px Arial';
             ctx.textAlign = 'left';
-            ctx.fillText('Rob Keys', 80, 80);
+            ctx.fillText('Rob Keys', 80, 100);
 
             // Subtitle (p style)
-            ctx.font = '40px Arial';
+            ctx.font = '36px Arial';
             ctx.fillStyle = '#444444';
             ctx.fillText('Software Development Engineer @ Amazon Web Services', 80, 140);
 
             // About This Site section
             let currentY = 240;
-            ctx.font = 'bold 60px Arial';
+            ctx.font = 'bold 48px Arial';
             ctx.fillStyle = '#333333';
             ctx.fillText('About This Site', 80, currentY);
             
             currentY += 50;
-            ctx.font = '32px Arial';
+            ctx.font = '30px Arial';
             ctx.fillStyle = '#444444';
-            currentY = this.wrapText(ctx, 'This interactive 3D portfolio features a scrollable main monitor (use your mouse wheel!), dynamic lighting that syncs with your local time of day, and various interactive objects on the desk.', 80, currentY, 1120, 40);
+            currentY = wrapText(ctx, 'This interactive 3D portfolio features a scrollable main monitor (use your mouse wheel!), dynamic lighting that syncs with your local time of day, and various interactive objects on the desk.', 80, currentY, 1120, 40);
 
             currentY += 50;
             ctx.fillStyle = '#333333';
@@ -111,7 +108,7 @@ export class TechnologyFactory {
             currentY += 50;
             ctx.fillStyle = '#444444';
             ctx.font = '32px Arial';
-            currentY = this.wrapText(ctx, 'Hi! I\'m a Software Development Engineer at Amazon Web Services with a passion for building scalable, impactful systems. I graduated from UVA with a B.S. in Computer Science, maintaining a 4.0 GPA while completing my degree in just three years.', 80, currentY, 1120, 40);
+            currentY = wrapText(ctx, 'Hi! I\'m a Software Development Engineer at Amazon Web Services with a passion for building scalable, impactful systems. I graduated from UVA with a B.S. in Computer Science, maintaining a 4.0 GPA while completing my degree in just three years.', 80, currentY, 1120, 40);
 
             texture.needsUpdate = true;
         }, 0));
@@ -134,9 +131,10 @@ export class TechnologyFactory {
             map: texture,
             emissive: 0xaabbcc,
             emissiveMap: texture,
-            emissiveIntensity: 0.9,
-            roughness: 0.4, // Increased roughness to reduce specular shimmering
+            emissiveIntensity: 1.15,
+            roughness: 0.15, // Lower roughness for realistic screen reflection
             metalness: 0.0,
+            envMapIntensity: LIGHTING_CONFIG.environment.screen
         });
 
         const sideScreenMaterial = new THREE.MeshStandardMaterial({
@@ -162,6 +160,38 @@ export class TechnologyFactory {
         screen.userData = { isScreen: true };
         group.add(screen);
 
+        // Dynamic screen glare overlay - responds to actual light positions
+        const glareGeometry = new THREE.PlaneGeometry(3.18, 1.38);
+        let glareMaterial;
+
+        if (this.lightingSystem) {
+            // Use dynamic glare shader from lighting system
+            glareMaterial = this.lightingSystem.createGlareMaterial({
+                glareIntensity: 0.35,
+                glareSharpness: 6.0,
+                fresnelPower: 2.5
+            });
+        } else {
+            // Fallback to simple material if lighting system not available
+            glareMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.05,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+        }
+
+        const glareOverlay = new THREE.Mesh(glareGeometry, glareMaterial);
+        glareOverlay.position.set(offsets.screen.x, offsets.screen.y, offsets.screen.z + 0.03);
+        glareOverlay.renderOrder = 1;
+
+        // Store material reference for camera updates
+        if (this.lightingSystem) {
+            glareOverlay.userData.glareMaterial = glareMaterial;
+        }
+        group.add(glareOverlay);
+
         // RectAreaLight to simulate even light from the rectangular screen surface
         // Width and height match the screen dimensions
         const screenLight = new THREE.RectAreaLight(0xd0e0ff, 3.0, 3.2, 1.4);
@@ -182,6 +212,8 @@ export class TechnologyFactory {
         });
         const bezel = new THREE.Mesh(bezelGeometry, bezelMaterial);
         bezel.position.set(offsets.bezel.x, offsets.bezel.y, offsets.bezel.z);
+        bezel.castShadow = true;
+        bezel.receiveShadow = true;
         group.add(bezel);
 
         // Inner bezel for screen
@@ -193,6 +225,8 @@ export class TechnologyFactory {
         });
         const innerBezel = new THREE.Mesh(innerBezelGeometry, innerBezelMaterial);
         innerBezel.position.set(offsets.innerBezel.x, offsets.innerBezel.y, offsets.innerBezel.z);
+        innerBezel.castShadow = true;
+        innerBezel.receiveShadow = true;
         group.add(innerBezel);
 
         // Power LED indicator
@@ -219,6 +253,7 @@ export class TechnologyFactory {
         for (let i = 0; i < 3; i++) {
             const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
             button.position.set(offsets.led.x - 0.15, offsets.led.y + 0.1 + (i * 0.05), offsets.led.z);
+            button.castShadow = true;
             group.add(button);
         }
 
@@ -231,6 +266,8 @@ export class TechnologyFactory {
         });
         const arm = new THREE.Mesh(armGeometry, armMaterial);
         arm.position.set(offsets.arm.x, offsets.arm.y, offsets.arm.z);
+        arm.castShadow = true;
+        arm.receiveShadow = true;
         group.add(arm);
 
         // Joint spheres
@@ -243,10 +280,14 @@ export class TechnologyFactory {
 
         const upperJoint = new THREE.Mesh(jointGeometry, jointMaterial);
         upperJoint.position.set(offsets.upperJoint.x, offsets.upperJoint.y, offsets.upperJoint.z);
+        upperJoint.castShadow = true;
+        upperJoint.receiveShadow = true;
         group.add(upperJoint);
 
         const lowerJoint = new THREE.Mesh(jointGeometry, jointMaterial);
         lowerJoint.position.set(offsets.lowerJoint.x, offsets.lowerJoint.y, offsets.lowerJoint.z);
+        lowerJoint.castShadow = true;
+        lowerJoint.receiveShadow = true;
         group.add(lowerJoint);
 
         // V-shaped base with rubber feet
@@ -259,6 +300,7 @@ export class TechnologyFactory {
         const base = new THREE.Mesh(baseGeometry, baseMaterial);
         base.position.set(offsets.base.x, offsets.base.y, offsets.base.z);
         base.castShadow = true;
+        base.receiveShadow = true;
         group.add(base);
 
         // Base plate detail
@@ -271,6 +313,7 @@ export class TechnologyFactory {
         const basePlate = new THREE.Mesh(basePlateGeometry, basePlateMaterial);
         basePlate.position.set(offsets.basePlate.x, offsets.basePlate.y, offsets.basePlate.z);
         basePlate.castShadow = true;
+        basePlate.receiveShadow = true;
         group.add(basePlate);
 
         // Rubber feet (positioned relative to basePlate)
@@ -308,12 +351,12 @@ export class TechnologyFactory {
         });
         const logo = new THREE.Mesh(logoGeometry, logoMaterial);
         logo.position.set(offsets.logo.x, offsets.logo.y, offsets.logo.z);
+        logo.castShadow = true;
         group.add(logo);
 
-        // Position entire monitor group using origin
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        group.userData = { name: 'monitor', label: 'Monitor - About Me' };
+        applyOrigin(group, origin, true); // Static object
+        group.userData.name = 'monitor';
+        group.userData.label = 'Monitor - About Me';
         this.interactiveObjects.push(group);
         return group;
     }
@@ -338,13 +381,13 @@ export class TechnologyFactory {
         // Shared materials
         const metalMaterial = new THREE.MeshStandardMaterial({
             color: 0x3a3a3a,
-            roughness: 0.3,
-            metalness: 0.9
+            roughness: 0.55,
+            metalness: 0.5
         });
         const darkMaterial = new THREE.MeshStandardMaterial({
             color: 0x2a2a2a,
-            roughness: 0.5,
-            metalness: 0.7
+            roughness: 0.7,
+            metalness: 0.3
         });
 
         // Keyboard base
@@ -352,6 +395,7 @@ export class TechnologyFactory {
         const base = new THREE.Mesh(baseGeometry, metalMaterial);
         base.position.set(offsets.base.x, offsets.base.y, offsets.base.z);
         base.castShadow = true;
+        base.receiveShadow = true;
         group.add(base);
 
         // Keyboard case
@@ -360,12 +404,15 @@ export class TechnologyFactory {
         keyboardCase.position.set(offsets.case.x, offsets.case.y, offsets.case.z);
         keyboardCase.rotation.x = -Math.PI / 36;
         keyboardCase.castShadow = true;
+        keyboardCase.receiveShadow = true;
         group.add(keyboardCase);
 
         // Wrist rest
         const wristRestGeometry = new THREE.BoxGeometry(2.1, 0.03, 0.15);
         const wristRest = new THREE.Mesh(wristRestGeometry, darkMaterial);
         wristRest.position.set(offsets.wristRest.x, offsets.wristRest.y, offsets.wristRest.z);
+        wristRest.castShadow = true;
+        wristRest.receiveShadow = true;
         group.add(wristRest);
 
         // Keyboard layout - collect all key positions first
@@ -462,6 +509,8 @@ export class TechnologyFactory {
         });
 
         keycapInstances.instanceMatrix.needsUpdate = true;
+        keycapInstances.castShadow = true;
+        keycapInstances.receiveShadow = true;
         group.add(keycapInstances);
 
         // Single LED indicator strip
@@ -481,17 +530,12 @@ export class TechnologyFactory {
         port.position.set(offsets.port.x, offsets.port.y, offsets.port.z);
         group.add(port);
 
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
+        applyOrigin(group, origin, true); // Static object
         group.userData = { name: 'keyboard', label: 'Keyboard - My Skills' };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Create simple mouse - arc body with scroll wheel
-     * Minimal geometry for fast rendering
-     */
     createMouse() {
         const group = new THREE.Group();
         const origin = this.origins.mouse;
@@ -509,12 +553,15 @@ export class TechnologyFactory {
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
         body.position.set(0, -0.12, 0);
         body.castShadow = true;
+        body.receiveShadow = true;
         group.add(body);
 
         // Flat bottom
         const bottomGeometry = new THREE.BoxGeometry(0.16, 0.02, 0.24);
         const bottom = new THREE.Mesh(bottomGeometry, bodyMaterial);
         bottom.position.set(0, -0.2, 0);
+        bottom.castShadow = true;
+        bottom.receiveShadow = true;
         group.add(bottom);
 
         // Scroll wheel
@@ -526,25 +573,22 @@ export class TechnologyFactory {
         const scrollWheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
         scrollWheel.position.set(0, -0.07, 0.04);
         scrollWheel.rotation.z = Math.PI / 2;
+        scrollWheel.castShadow = true;
         group.add(scrollWheel);
 
         // Button divider line
         const dividerGeometry = new THREE.BoxGeometry(0.004, 0.01, 0.1);
         const divider = new THREE.Mesh(dividerGeometry, new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
         divider.position.set(0, -0.06, 0.06);
+        divider.castShadow = true;
         group.add(divider);
 
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
+        applyOrigin(group, origin, true); // Static object
         group.userData = { name: 'mouse', label: 'Mouse - Navigation & Tools' };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Create simple laptop with base (keyboard) and screen lid
-     * All part positions are relative to the laptop origin defined in this.origins.laptop
-     */
     createLaptop() {
         const group = new THREE.Group();
         const origin = this.origins.laptop;
@@ -560,6 +604,7 @@ export class TechnologyFactory {
         const base = new THREE.Mesh(baseGeometry, metalMaterial);
         base.position.set(0, 0.025, 0);
         base.castShadow = true;
+        base.receiveShadow = true;
         group.add(base);
 
         // Keyboard keys on the base - matte plastic
@@ -584,6 +629,8 @@ export class TechnologyFactory {
                     0.06,
                     keysStartZ + row * keyGap
                 );
+                key.castShadow = true;
+                key.receiveShadow = true;
                 group.add(key);
             }
         }
@@ -592,6 +639,8 @@ export class TechnologyFactory {
         const spaceGeometry = new THREE.BoxGeometry(0.5, 0.02, keySize);
         const spacebar = new THREE.Mesh(spaceGeometry, keyMaterial);
         spacebar.position.set(0, 0.06, keysStartZ + 5 * keyGap);
+        spacebar.castShadow = true;
+        spacebar.receiveShadow = true;
         group.add(spacebar);
 
         // Screen lid (hinged at the back)
@@ -601,6 +650,7 @@ export class TechnologyFactory {
         const lidGeometry = new THREE.BoxGeometry(1.4, 0.9, 0.04);
         const lid = new THREE.Mesh(lidGeometry, metalMaterial);
         lid.position.set(0, 0.45, 0);
+        lid.castShadow = true;
         screenLid.add(lid);
 
         // Create screen display content
@@ -652,21 +702,24 @@ export class TechnologyFactory {
             ctx.fillStyle = '#333333';
             ctx.font = 'bold 32px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('Portfolio Projects', canvas.width / 2, 200);
+            ctx.fillText('Work Experience', canvas.width / 2, 200);
+
+            ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = '#333333';
+            ctx.fillText('Amazon Web Services', canvas.width / 2, 280);
 
             ctx.font = '20px Arial';
             ctx.fillStyle = '#4a90e2';
-            ctx.fillText('703bakehouse.com - Local Bakery Website', canvas.width / 2, 280);
-            ctx.fillText('Eggs By The Dozen - Full-Stack Application', canvas.width / 2, 320);
-            ctx.fillText('Statistics R Project - Data Analysis', canvas.width / 2, 360);
+            ctx.fillText('Software Development Engineer', canvas.width / 2, 320);
+            ctx.fillText('Starting June 2026 | Full-time', canvas.width / 2, 355);
 
             ctx.font = 'bold 24px Arial';
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillText('Current Project', canvas.width / 2, 420);
+            ctx.fillStyle = '#333333';
+            ctx.fillText('AWS - SDE Intern', canvas.width / 2, 420);
 
-            ctx.font = '18px Arial';
+            ctx.font = '20px Arial';
             ctx.fillStyle = '#4a90e2';
-            ctx.fillText('This Interactive 3D Portfolio', canvas.width / 2, 460);
+            ctx.fillText('Summer 2025 | Seattle, WA', canvas.width / 2, 460);
 
             texture.needsUpdate = true;
         }, 0));
@@ -687,10 +740,39 @@ export class TechnologyFactory {
             emissiveIntensity: 1,
             roughness: 0.05,
             metalness: 0.0,
+            envMapIntensity: LIGHTING_CONFIG.environment.screen
         });
         const screen = new THREE.Mesh(screenGeometry, screenMaterial);
         screen.position.set(0, 0.45, 0.025);
         screenLid.add(screen);
+
+        // Dynamic glare overlay for laptop screen
+        const laptopGlareGeometry = new THREE.PlaneGeometry(1.28, 0.78);
+        let laptopGlareMaterial;
+
+        if (this.lightingSystem) {
+            laptopGlareMaterial = this.lightingSystem.createGlareMaterial({
+                glareIntensity: 0.25, // Less intense than monitor
+                glareSharpness: 5.0,
+                fresnelPower: 2.0
+            });
+        } else {
+            laptopGlareMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.03,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+        }
+
+        const laptopGlareOverlay = new THREE.Mesh(laptopGlareGeometry, laptopGlareMaterial);
+        laptopGlareOverlay.position.set(0, 0.45, 0.03);
+        laptopGlareOverlay.renderOrder = 1;
+        if (this.lightingSystem) {
+            laptopGlareOverlay.userData.glareMaterial = laptopGlareMaterial;
+        }
+        screenLid.add(laptopGlareOverlay);
 
         // RectAreaLight for laptop screen - even light from rectangular surface
         // Width and height match the laptop screen dimensions
@@ -708,23 +790,18 @@ export class TechnologyFactory {
         screenLid.rotation.x = -Math.PI / 6;  // Open at ~30 degrees from vertical
         group.add(screenLid);
 
-        // Position entire laptop group using origin
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        group.userData = { name: 'laptop', label: 'Laptop - My Projects' };
+        applyOrigin(group, origin, true); // Static object
+        group.userData = { name: 'laptop', label: 'Laptop - Work Experience' };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Create digital clock with real-time display
-     */
     createDigitalClock() {
         const group = new THREE.Group();
         const origin = this.origins.clock;
 
         // Clock body - sleek rectangular box
-        const bodyGeometry = new THREE.BoxGeometry(0.6, 0.25, 0.1);
+        const bodyGeometry = new THREE.BoxGeometry(0.8, 0.4, 0.1);
         const bodyMaterial = new THREE.MeshStandardMaterial({
             color: 0x111111,
             roughness: 0.2,
@@ -733,6 +810,7 @@ export class TechnologyFactory {
         const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
         body.position.y = 0.08; // Sit on desk surface
         body.castShadow = true;
+        body.receiveShadow = true;
         group.add(body);
 
         // LED Screen
@@ -751,7 +829,7 @@ export class TechnologyFactory {
             color: 0xffffff
         });
         const screen = new THREE.Mesh(screenGeometry, screenMaterial);
-        screen.position.set(0, 0.08, 0.051); // Slightly in front of body
+        screen.position.set(0, 0.15, 0.051); // Slightly in front of body
         group.add(screen);
 
         // Time update function
@@ -780,47 +858,12 @@ export class TechnologyFactory {
 
         updateTime();
 
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        
-        group.userData = { 
-            name: 'clock', 
-            label: 'Digital Clock',
-            updateTime: updateTime
-        };
-        
+        applyOrigin(group, origin);
+        group.userData = { name: 'clock', label: 'Digital Clock', updateTime };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Helper to wrap text
-     */
-    wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-        const words = text.split(' ');
-        let line = '';
-        let currentY = y;
-
-        for (let i = 0; i < words.length; i++) {
-            const testLine = line + words[i] + ' ';
-            const metrics = ctx.measureText(testLine);
-            const testWidth = metrics.width;
-
-            if (testWidth > maxWidth && i > 0) {
-                ctx.fillText(line, x, currentY);
-                line = words[i] + ' ';
-                currentY += lineHeight;
-            } else {
-                line = testLine;
-            }
-        }
-        ctx.fillText(line, x, currentY);
-        return currentY + lineHeight;
-    }
-
-    /**
-     * Get all created interactive objects
-     */
     getInteractiveObjects() {
         return this.interactiveObjects;
     }

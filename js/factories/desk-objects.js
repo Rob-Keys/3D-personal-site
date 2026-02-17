@@ -3,16 +3,16 @@
  * Handles coffee mugs, desk lamps, notebooks, and other items that sit on the desk
  */
 
+import { applyOrigin } from '../systems/utils.js';
+import { SHADOW_CONFIG, OBJECT_ORIGINS } from '../config/config.js';
+
 export class DeskObjectFactory {
     constructor(scene) {
         this.scene = scene;
         this.interactiveObjects = [];
 
-        this.origins = {
-            notebook: { x: 2.2, y: 1, z: 0.7, rotationX: 0, rotationY: -Math.PI / 6, rotationZ: 0 },
-            coffee:   { x: -1.8, y: 1, z: -0.5, rotationX: 0, rotationY: 0, rotationZ: 0 },
-            lamp:     { x: 2.5, y: 1, z: -0.8,  rotationX: 0, rotationY: 0, rotationZ: 0 }
-        };
+        // Use centralized origins from config
+        this.origins = OBJECT_ORIGINS.desk;
     }
 
     /**
@@ -35,6 +35,8 @@ export class DeskObjectFactory {
         });
         const cover = new THREE.Mesh(coverGeometry, coverMaterial);
         cover.position.set(offsets.cover.x, offsets.cover.y, offsets.cover.z);
+        cover.castShadow = true;
+        cover.receiveShadow = true;
         group.add(cover);
 
         // Create canvas for handwritten text
@@ -74,13 +76,13 @@ export class DeskObjectFactory {
         ctx.textBaseline = 'bottom';
 
         const textLines = [
-            "Current Projects:",
+            "Personal Projects:",
             "",
-            "Friendly - iOS app",
+            "SweetHopeBakeryy - Bakery site for sister: written in PHP and then migrated to JS",
             "",
-            "Variety - OSS PR with CI/CD",
+            "Tidbyt - Unique clock app for physical 'Tidbyt' pixel display, in custom language",
             "",
-            "3D Printing - Physical fun!"
+            "Variety - Contributed to OSS Linux wallpaper manager",
         ];
 
         let currentY = topMargin + lineHeight; 
@@ -149,6 +151,8 @@ export class DeskObjectFactory {
                 offsets.cover.y + 0.025 + (i * 0.006),
                 offsets.cover.z
             );
+            page.castShadow = true;
+            page.receiveShadow = true;
             group.add(page);
         }
 
@@ -160,18 +164,16 @@ export class DeskObjectFactory {
         });
         const binding = new THREE.Mesh(bindingGeometry, bindingMaterial);
         binding.position.set(offsets.binding.x, offsets.binding.y, offsets.binding.z);
+        binding.castShadow = true;
+        binding.receiveShadow = true;
         group.add(binding);
 
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        group.userData = { name: 'notebook', label: 'Notebook - Work Experience' };
+        applyOrigin(group, origin, true); // Static object
+        group.userData = { name: 'notebook', label: 'Notebook - Personal Projects' };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Create Starbucks-style paper coffee cup with sleeve and lid
-     */
     createCoffeeMug() {
         const group = new THREE.Group();
         const origin = this.origins.coffee;
@@ -228,8 +230,9 @@ export class DeskObjectFactory {
         const coffeeGeometry = new THREE.CylinderGeometry(coffeeRadius, coffeeRadius, 0.001, 32);
         const coffeeMaterial = new THREE.MeshStandardMaterial({
             color: 0x3d2314,
-            roughness: 0.15,
+            roughness: 0.05, // Very smooth liquid surface for realistic reflection
             metalness: 0.0,
+            envMapIntensity: 0.6 // Reflect environment for liquid look
         });
         const coffee = new THREE.Mesh(coffeeGeometry, coffeeMaterial);
         coffee.position.set(offsets.cup.x, coffeeLevel, offsets.cup.z);
@@ -253,6 +256,7 @@ export class DeskObjectFactory {
             const line = new THREE.Mesh(lineGeometry, lineMaterial);
             const lineY = offsets.sleeve.y - sleeveHeight / 2 + (i + 0.5) * (sleeveHeight / 12);
             line.position.set(offsets.sleeve.x, lineY, offsets.sleeve.z);
+            line.castShadow = true;
             group.add(line);
         }
 
@@ -327,22 +331,12 @@ export class DeskObjectFactory {
             });
         };
 
-        // Position entire coffee group using origin
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        group.userData = {
-            name: 'coffee',
-            label: 'Starbucks - What Drives Me',
-            animateSteam: animateSteamFunc
-        };
+        applyOrigin(group, origin);
+        group.userData = { name: 'coffee', label: 'Starbucks - What Drives Me', animateSteam: animateSteamFunc };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Create desk lamp with single arm and adjustable head
-     * Simple construction: base -> vertical stem -> angled neck -> shade pointing at notebook
-     */
     createDeskLamp() {
         const group = new THREE.Group();
         const origin = this.origins.lamp;
@@ -365,6 +359,7 @@ export class DeskObjectFactory {
         const base = new THREE.Mesh(baseGeometry, metalMaterial);
         base.position.set(0, -0.15, 0);
         base.castShadow = true;
+        base.receiveShadow = true;
         group.add(base);
 
         // Vertical stem rising from base center
@@ -380,6 +375,7 @@ export class DeskObjectFactory {
         const joint = new THREE.Mesh(jointGeometry, chromeMaterial);
         const jointY = -0.11 + stemHeight;
         joint.position.set(0, jointY, 0);
+        joint.castShadow = true;
         group.add(joint);
 
         // Angled neck extending toward the notebook
@@ -408,7 +404,10 @@ export class DeskObjectFactory {
         const headGroup = new THREE.Group();
 
         // Conical shade - wider at bottom where light exits
-        const shadeGeometry = new THREE.ConeGeometry(0.18, 0.22, 24, 1, true);
+        // Cone tip is at top (y=+height/2), open base at bottom (y=-height/2)
+        const shadeHeight = 0.22;
+        const shadeRadius = 0.18;
+        const shadeGeometry = new THREE.ConeGeometry(shadeRadius, shadeHeight, 24, 1, true);
         const shadeMaterial = new THREE.MeshStandardMaterial({
             color: 0x2d4a2d,
             roughness: 0.4,
@@ -428,10 +427,14 @@ export class DeskObjectFactory {
             side: THREE.BackSide
         });
         const innerShade = new THREE.Mesh(innerShadeGeometry, innerShadeMaterial);
+        innerShade.castShadow = true;
         headGroup.add(innerShade);
 
-        // Light bulb visible inside shade - warm incandescent glow
-        const bulbGeometry = new THREE.SphereGeometry(0.045, 16, 16);
+        // Light bulb positioned inside the cone shade
+        // Cone extends from y=-shadeHeight/2 (open base) to y=+shadeHeight/2 (tip)
+        // Place bulb in the upper portion of the cone interior
+        const bulbY = shadeHeight * 0.15; // Inside cone, toward the narrow end
+        const bulbGeometry = new THREE.SphereGeometry(0.04, 16, 16);
         const bulbMaterial = new THREE.MeshStandardMaterial({
             color: 0xfff8e0,
             emissive: 0xffaa44,
@@ -442,11 +445,12 @@ export class DeskObjectFactory {
             metalness: 0.0
         });
         const bulb = new THREE.Mesh(bulbGeometry, bulbMaterial);
-        bulb.position.set(0, 0.04, 0);
+        bulb.position.set(0, bulbY, 0);
+        bulb.castShadow = true;
         headGroup.add(bulb);
 
         // Inner glow sphere for volumetric light effect
-        const glowGeometry = new THREE.SphereGeometry(0.06, 12, 12);
+        const glowGeometry = new THREE.SphereGeometry(0.055, 12, 12);
         const glowMaterial = new THREE.MeshBasicMaterial({
             color: 0xffdd88,
             transparent: true,
@@ -454,7 +458,7 @@ export class DeskObjectFactory {
             side: THREE.BackSide
         });
         const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-        glow.position.set(0, 0.04, 0);
+        glow.position.set(0, bulbY, 0);
         headGroup.add(glow);
 
         // Position head at end of neck, shade opening faces forward and down toward desk
@@ -465,29 +469,32 @@ export class DeskObjectFactory {
 
         // Main SpotLight aimed at the notebook for focused illumination
         // Warm color temperature (2700K-ish) for realistic incandescent light
+        // Target the center of the notebook page (offset from origin to account for page center)
         const notebookRelative = {
-            x: this.origins.notebook.x - origin.x,
+            x: this.origins.notebook.x - origin.x + 0.5,  // Offset toward page center X
             y: this.origins.notebook.y - origin.y,
-            z: this.origins.notebook.z - origin.z
+            z: this.origins.notebook.z - origin.z // Offset toward page center Z
         };
 
-        // SpotLight aimed at the notebook - warm incandescent color, steep falloff
-        const spotLight = new THREE.SpotLight(0xffddaa, 3.0, 6, Math.PI / 4, 1.0, 2);
+        // SpotLight aimed at the notebook - warm incandescent color
+        // Wider angle (PI/2.5 ~72°) with softer penumbra to cover entire notebook page
+        const spotLight = new THREE.SpotLight(0xffddaa, 0.8, 6, Math.PI / 2.5, 0.6, 2); // decay: 2 for physical falloff
         spotLight.position.set(neckEndX, neckEndY - 0.05, neckEndZ);
         spotLight.target.position.set(notebookRelative.x, notebookRelative.y, notebookRelative.z);
         spotLight.castShadow = true;
-        spotLight.shadow.mapSize.width = 2048;
-        spotLight.shadow.mapSize.height = 2048;
+        spotLight.shadow.mapSize.width = SHADOW_CONFIG.lamp.mapSize;
+        spotLight.shadow.mapSize.height = SHADOW_CONFIG.lamp.mapSize;
         spotLight.shadow.camera.near = 0.05;
         spotLight.shadow.camera.far = 8;
-        spotLight.shadow.bias = -0.0002;
-        spotLight.shadow.radius = 3;
+        spotLight.shadow.bias = SHADOW_CONFIG.lamp.bias;
+        spotLight.shadow.normalBias = SHADOW_CONFIG.lamp.normalBias;
+        spotLight.shadow.radius = SHADOW_CONFIG.lamp.radius; // Softer shadow edges
         group.add(spotLight);
         group.add(spotLight.target);
 
         // Point light for warm ambient glow around the lamp - steep decay
-        // Reduced distance to prevent light leaking through the metal shade onto the wall
-        const warmFillLight = new THREE.PointLight(0xffcc88, 0.8, 0.6, 2);
+        // Increased distance for better ambient light spread
+        const warmFillLight = new THREE.PointLight(0xffcc88, 0.6, 1.5, 2);
         warmFillLight.position.set(neckEndX, neckEndY, neckEndZ);
         group.add(warmFillLight);
 
@@ -500,26 +507,15 @@ export class DeskObjectFactory {
         });
         const lampSwitch = new THREE.Mesh(switchGeometry, switchMaterial);
         lampSwitch.position.set(0.18, -0.12, 0);
+        lampSwitch.castShadow = true;
         group.add(lampSwitch);
 
-        // Position entire lamp group using origin
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-
-        // Store light references for dynamic updates
-        group.userData = {
-            name: 'lamp',
-            label: 'Desk Lamp - Resume',
-            deskLampLight: spotLight,
-            warmFillLight: warmFillLight
-        };
+        applyOrigin(group, origin, true); // Static object
+        group.userData = { name: 'lamp', label: 'Desk Lamp - Resume', deskLampLight: spotLight, warmFillLight: warmFillLight };
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Get all created interactive objects
-     */
     getInteractiveObjects() {
         return this.interactiveObjects;
     }

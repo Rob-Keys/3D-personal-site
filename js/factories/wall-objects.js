@@ -1,29 +1,29 @@
 /**
  * Wall-mounted objects creation
- * Handles certificate, and other wall-mounted items
+ * Handles diploma, and other wall-mounted items
  */
+
+import { applyOrigin } from '../systems/utils.js';
+import { OBJECT_ORIGINS } from '../config/config.js';
 
 export class WallObjectFactory {
     constructor(scene) {
         this.scene = scene;
         this.interactiveObjects = [];
+        this._diploma = null; // Reference for post-init finalization
 
-        // Origin reference points for each object - change these to reposition entire objects
-        this.origins = {
-            certificate: { x: 3.2, y: 2.5, z: -1.8, rotationX: 0, rotationY: 0, rotationZ: 0 },
-            vinyl:       { x: -4, y: 3., z: -1.9, rotationX: 0, rotationY: 0, rotationZ: 0 },
-            mobileSign:  { x: 0, y: 4.5, z: -1.84, rotationX: 0, rotationY: 0, rotationZ: 0 }
-        };
+        // Use centralized origins from config
+        this.origins = OBJECT_ORIGINS.wall;
     }
 
     /**
-     * Create wall certificate
+     * Create wall diploma
      */
-    createWallCertificate() {
+    createWallDiploma() {
         const group = new THREE.Group();
-        const origin = this.origins.certificate;
+        const origin = this.origins.diploma;
 
-        // Part offsets relative to certificate origin (origin is at frame center)
+        // Part offsets relative to diploma origin (origin is at frame center)
         // cert z must be > 0.04 (half of frame depth 0.08) to avoid z-fighting
         const offsets = {
             cert: { x: 0, y: 0, z: 0.045 }
@@ -50,7 +50,7 @@ export class WallObjectFactory {
         frame.receiveShadow = true;
         group.add(frame);
 
-        // Certificate canvas
+        // diploma canvas
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 384;
@@ -104,7 +104,7 @@ export class WallObjectFactory {
             ctx.fillStyle = '#1a1a2a';
             ctx.font = 'bold 24px Georgia, serif';
             ctx.textAlign = 'center';
-            ctx.fillText('CERTIFICATE OF', canvas.width / 2, 55);
+            ctx.fillText('diploma OF', canvas.width / 2, 55);
 
             ctx.font = 'bold 32px Georgia, serif';
             ctx.fillStyle = '#2d4a22';
@@ -179,7 +179,7 @@ export class WallObjectFactory {
         texture.magFilter = THREE.LinearFilter;
         texture.anisotropy = 4;
 
-        // Certificate surface
+        // diploma surface
         const certGeometry = new THREE.PlaneGeometry(1.1, 0.8);
         const certMaterial = new THREE.MeshPhysicalMaterial({
             map: texture,
@@ -207,6 +207,7 @@ export class WallObjectFactory {
             brassMaterial
         );
         mount.position.set(0, 0, -0.02);
+        mount.castShadow = true;
         lightGroup.add(mount);
 
         // Curved arms extending out
@@ -215,6 +216,7 @@ export class WallObjectFactory {
             const arm = new THREE.Mesh(armGeometry, brassMaterial);
             arm.position.set(x, 0.05, 0.1);
             arm.rotation.x = Math.PI / 2;
+            arm.castShadow = true;
             lightGroup.add(arm);
         });
 
@@ -225,157 +227,97 @@ export class WallObjectFactory {
         );
         housing.rotation.z = Math.PI / 2;
         housing.position.set(0, 0.05, 0.22);
+        housing.castShadow = true;
         lightGroup.add(housing);
-
-        // The actual light source - RectAreaLight for a strip light effect
-        const artLight = new THREE.RectAreaLight(0xffeebb, 5.0, 0.8, 0.15);
-        artLight.position.set(0, 0.05, 0.22);
-        // Point at the certificate (approx position relative to lightGroup)
-        artLight.lookAt(0, -0.55, 0.045);
-        
-        lightGroup.add(artLight);
 
         // Position light group above the frame
         lightGroup.position.set(0, 0.55, 0);
         group.add(lightGroup);
 
-        // Position entire certificate group using origin
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        group.userData = { name: 'certificate', label: 'Certificate - Education' };
+        // The actual light source - RectAreaLight for rectangular strip light effect
+        // Position it at the housing location in world space relative to group
+        // Width matches the diploma width, height is thin strip
+        const artLight = new THREE.RectAreaLight(0xffeebb, 5.0, 1.1, 0.15);
+        // Position at housing location (lightGroup.y + housing.y, lightGroup.z + housing.z)
+        artLight.position.set(0, 0.55 + 0.05, 0.22);
+        // Use lookAt to point at the diploma center
+        artLight.lookAt(0, 0, 0.045);
+        group.add(artLight);
+
+        applyOrigin(group, origin, true); // Static object
+        group.userData.name = 'diploma';
+        group.userData.label = 'diploma - Education';
+        group.userData.artLight = artLight;
+        group.userData.lightTarget = cert; // Store target for light finalization
         this.interactiveObjects.push(group);
+        this._diploma = group; // Store reference for finalization
         return group;
     }
 
     /**
-     * Create vinyl record and album cover decoration
+     * Finalize diploma light direction after scene matrices are computed.
+     * Must be called after the diploma is added to the scene and rendered once.
      */
+    finalizeDiplomaLight() {
+        const diploma = this._diploma;
+        if (!diploma?.userData.artLight) return;
+
+        diploma.updateMatrixWorld(true);
+        if (diploma.userData.lightTarget) {
+            const targetWorldPos = new THREE.Vector3();
+            diploma.userData.lightTarget.getWorldPosition(targetWorldPos);
+            diploma.userData.artLight.lookAt(targetWorldPos);
+        }
+        diploma.userData.artLight.rotation.x += 0.3;
+    }
+
     createVinylRecord() {
         const group = new THREE.Group();
         const origin = this.origins.vinyl;
 
-        const offsets = {
-            cover: { x: 0, y: 0.06, z: 0.02 },
-            record: { x: 0, y: -0.12, z: 0.025 } // Record sliding out bottom
-        };
+        // Album cover size and spacing
+        const coverSize = 0.35;
+        const spacing = 0.36; // Space between covers (reduced for tighter grid)
+        const coverDepth = 0.01;
 
-        // Album Cover
-        const coverGeometry = new THREE.BoxGeometry(0.35, 0.35, 0.01);
+        // Album cover geometry
+        const coverGeometry = new THREE.BoxGeometry(coverSize, coverSize, coverDepth);
         
-        // Load Olivia Dean image
+        // Load all 4 album cover images
         const textureLoader = new THREE.TextureLoader();
-        const coverTexture = textureLoader.load('assets/images/olivia_dean.webp');
-        coverTexture.colorSpace = THREE.SRGBColorSpace;
-        
-        const coverMaterial = new THREE.MeshStandardMaterial({
-            map: coverTexture,
-            roughness: 0.2,
-            metalness: 0.0
-        });
-        
-        const cover = new THREE.Mesh(coverGeometry, coverMaterial);
-        cover.position.set(offsets.cover.x, offsets.cover.y, offsets.cover.z);
-        cover.castShadow = true;
-        group.add(cover);
+        const albumImages = [
+            { path: 'assets/images/kendrick.webp', position: { x: -spacing/2, y: spacing/2 } }, // Top left
+            { path: 'assets/images/kanye.webp', position: { x: spacing/2, y: spacing/2 } }, // Top right
+            { path: 'assets/images/mt_joy.webp', position: { x: -spacing/2, y: -spacing/2 } }, // Bottom left
+            { path: 'assets/images/olivia_dean.webp', position: { x: spacing/2, y: -spacing/2 } } // Bottom right
+        ];
 
-        // Vinyl Record
-        const recordGeometry = new THREE.CylinderGeometry(0.17, 0.17, 0.005, 32);
-        const recordMaterial = new THREE.MeshStandardMaterial({
-            color: 0x111111,
-            roughness: 0.15,
-            metalness: 0.1
+        // Create each album cover
+        albumImages.forEach((album, index) => {
+            const coverTexture = textureLoader.load(album.path);
+            coverTexture.colorSpace = THREE.SRGBColorSpace;
+            
+            const coverMaterial = new THREE.MeshStandardMaterial({
+                map: coverTexture,
+                roughness: 0.2,
+                metalness: 0.0
+            });
+            
+            const cover = new THREE.Mesh(coverGeometry, coverMaterial);
+            cover.position.set(album.position.x, album.position.y, coverDepth);
+            cover.castShadow = true;
+            cover.receiveShadow = true;
+            group.add(cover);
         });
-        
-        const record = new THREE.Mesh(recordGeometry, recordMaterial);
-        record.rotation.x = Math.PI / 2;
-        record.position.set(offsets.record.x, offsets.record.y, offsets.record.z);
-        record.castShadow = true;
-        group.add(record);
-        
-        // Record Label
-        const labelGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.006, 32);
-        const labelMaterial = new THREE.MeshStandardMaterial({
-            color: 0xff3300,
-            roughness: 0.4
-        });
-        const label = new THREE.Mesh(labelGeometry, labelMaterial);
-        label.rotation.x = Math.PI / 2;
-        label.position.set(offsets.record.x, offsets.record.y, offsets.record.z);
-        group.add(label);
 
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        group.scale.set(4, 4, 4);
+        group.scale.set(4, 4, 4); // Must set scale before freezing matrix
+        applyOrigin(group, origin, true); // Static object
+        group.userData.name = 'vinyl';
+        group.userData.label = 'vinyl - Music & Creativity';
         this.interactiveObjects.push(group);
         return group;
     }
 
-    /**
-     * Create warning sign for mobile users
-     */
-    createMobileWarningSign() {
-        const group = new THREE.Group();
-        
-        // Only create content on mobile devices (width < 768px)
-        if (window.innerWidth >= 768) return group;
-
-        const origin = this.origins.mobileSign;
-
-        // Sign board geometry
-        const geometry = new THREE.PlaneGeometry(2.5, 1.2);
-        
-        // Create canvas for text
-        const canvas = document.createElement('canvas');
-        canvas.width = 1024;
-        canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        // Background - Dark red warning style
-        ctx.fillStyle = '#8B0000'; 
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Inner border
-        ctx.strokeStyle = '#ffcccc';
-        ctx.lineWidth = 15;
-        ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
-
-        // Text configuration
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
-        
-        // Main warning text
-        ctx.font = 'bold 80px Arial';
-        ctx.fillText('Site not intended', canvas.width / 2, 180);
-        ctx.fillText('for mobile use', canvas.width / 2, 280);
-        
-        // Subtitle text
-        ctx.font = '30px Arial';
-        ctx.fillStyle = '#ffcccc';
-        ctx.fillText('Desktop is the preferred viewing medium', canvas.width / 2, 420);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        if (texture.colorSpace !== undefined) texture.colorSpace = THREE.SRGBColorSpace;
-        else if (THREE.sRGBEncoding !== undefined) texture.encoding = THREE.sRGBEncoding;
-        
-        const material = new THREE.MeshStandardMaterial({
-            map: texture,
-            roughness: 0.3,
-            metalness: 0.1
-        });
-
-        const sign = new THREE.Mesh(geometry, material);
-        sign.castShadow = true;
-        group.add(sign);
-
-        group.position.set(origin.x, origin.y, origin.z);
-        group.rotation.set(origin.rotationX, origin.rotationY, origin.rotationZ);
-        
-        return group;
-    }
-
-    /**
-     * Get all created interactive objects
-     */
     getInteractiveObjects() {
         return this.interactiveObjects;
     }
